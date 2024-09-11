@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from io import BytesIO
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
@@ -7,10 +8,14 @@ import global_variables as enum
 app = Flask(__name__)
 
 # Load the model
-model = tf.keras.models.load_model('./model/model3.keras')
+model = tf.keras.models.load_model('./model/model5.keras')
 
 # Prepare the image before making predictions
-def prepare_image(img):
+def prepare_image(img_stream):
+    # Convert the image stream (SpooledTemporaryFile) to BytesIO
+    img = BytesIO(img_stream.read())
+    
+    # Use load_img with the BytesIO stream
     img = load_img(img, target_size=enum.GlobalVariables.IMG_SIZE.value)
     img_array = img_to_array(img)
     img_array = np.expand_dims(img_array, axis=0)
@@ -37,8 +42,8 @@ def predict():
 
     try:
         # Process the image and get the prediction
-        img_path = file.stream  # file is in-memory stream
-        pred_class, confidence = predict_image(img_path)
+        img_stream = file.stream  # This is an in-memory stream of the file
+        pred_class, confidence = predict_image(img_stream)
 
         # Get the predicted fruit or vegetable class name
         predicted_label = enum.GlobalVariables.CLASS_IMAGES.value[pred_class]
@@ -52,4 +57,6 @@ def predict():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000)
+
