@@ -2,3 +2,5 @@ opencv-python
 keras
 scikit-learn
 seaborn
+tensorflow
+flask
