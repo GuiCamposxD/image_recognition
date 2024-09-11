@@ -5,11 +5,25 @@ from model import create_model
 from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+import matplotlib.pyplot as plt
+
+import numpy as np
+
 # Pre-processing data for CNN
 BATCH_SIZE = 20
 
 # Create an instance of the ImageDataGenerator for the test set (usually without augmentation)
-train_datagen = ImageDataGenerator(rescale=1./255)
+train_datagen = ImageDataGenerator(
+  rescale=1./255,
+  rotation_range=15,
+  width_shift_range=0.20,
+  height_shift_range=0.25,
+  shear_range=0.15,
+  zoom_range=0.30,
+  horizontal_flip=True,
+  fill_mode='nearest'
+)
 test_datagen = ImageDataGenerator(rescale=1./255)
 
 # Create the generators
@@ -39,7 +53,7 @@ val = test_datagen.flow_from_directory(
 
 # Define callbacks
 checkpoint_callback = ModelCheckpoint(
-  './model/model3.keras',
+  './model/model5.keras',
   monitor='val_accuracy',
   save_best_only=True,
   mode='max',
@@ -61,4 +75,4 @@ history = model.fit(
 with open('training_history.pkl', 'wb') as f:
   pickle.dump(history.history, f)
 
-model.save('model/model3_save.keras')
+model.save('model/model5_save.keras')
