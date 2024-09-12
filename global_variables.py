@@ -10,4 +10,4 @@ class GlobalVariables(Enum):
   TEST_PATH = './data_set/working/test'
   TRAIN_PATH = './data_set/working/train'
   VAL_PATH = './data_set/working/validation'
-  CLASS_IMAGES = image_dataset_from_directory(TRAIN_PATH).class_names
+  CLASS_IMAGES = image_dataset_from_directory(TEST_PATH).class_names
