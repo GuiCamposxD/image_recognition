@@ -21,7 +21,7 @@ def prepare_image(img_stream):
     img = BytesIO(img_stream.read())
     
     # Use load_img with the BytesIO stream
-    img = load_img(img, target_size=(128, 128).value)
+    img = load_img(img, target_size=(128, 128))
     img_array = img_to_array(img)
     img_array = np.expand_dims(img_array, axis=0)
     img_array = img_array / 255.0
@@ -51,7 +51,7 @@ def predict():
         pred_class, confidence = predict_image(img_stream)
 
         # Get the predicted fruit or vegetable class name
-        predicted_label = CLASS_IMAGES.value[pred_class]
+        predicted_label = CLASS_IMAGES[pred_class]
         
         return jsonify({
             "predicted_label": predicted_label,
