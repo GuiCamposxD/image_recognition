@@ -3,9 +3,14 @@ from io import BytesIO
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.preprocessing.image import load_img, img_to_array # type: ignore
-import global_variables as enum
 
 app = Flask(__name__)
+
+CLASS_IMAGES = [
+    "apple", "banana", "beetroot", "bell pepper", "cabbage", "capsicum", "carrot",
+    "cauliflower", "chilli pepper", "corn", "cucumber", "eggplant", "garlic",
+    "ginger", "grapes", "jalepeno", "kiwi", "lemon", "lettuce", "mango"
+  ]
 
 # Load the model
 model = tf.keras.models.load_model('./model/model5.keras')
@@ -16,7 +21,7 @@ def prepare_image(img_stream):
     img = BytesIO(img_stream.read())
     
     # Use load_img with the BytesIO stream
-    img = load_img(img, target_size=enum.GlobalVariables.IMG_SIZE.value)
+    img = load_img(img, target_size=(128, 128).value)
     img_array = img_to_array(img)
     img_array = np.expand_dims(img_array, axis=0)
     img_array = img_array / 255.0
@@ -46,7 +51,7 @@ def predict():
         pred_class, confidence = predict_image(img_stream)
 
         # Get the predicted fruit or vegetable class name
-        predicted_label = enum.GlobalVariables.CLASS_IMAGES.value[pred_class]
+        predicted_label = CLASS_IMAGES.value[pred_class]
         
         return jsonify({
             "predicted_label": predicted_label,

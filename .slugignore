@@ -169,3 +169,11 @@ model3*.keras
 model4*.keras
 model5_save.keras
 /testing
+evaluate_model.py
+global_variables.py
+model.py
+resizing_images.py
+testing_server.py
+testing.py
+training.py
+*.pkl
