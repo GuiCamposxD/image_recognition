@@ -1,1 +1,1 @@
-web: python testing_server.py
+web: python testing_server_heroku.py
