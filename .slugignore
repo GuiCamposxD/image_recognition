@@ -176,7 +176,6 @@ resizing_images.py
 testing_server.py
 testing.py
 training.py
-Procfile
 runtime.txt
 *.pkl
 *.old.txt
