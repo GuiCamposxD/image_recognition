@@ -2,14 +2,14 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: EC2 instance for Flask API with Nginx as reverse proxy
 
 Resources:
-  MyEC2Instance:
-    Type: AWS::EC2::Instance
-    Properties: 
-      InstanceType: t2.micro
-      KeyName: EC2 Tutorial  # Replace with your own key pair name
-      ImageId: ami-005fc0f236362e99f  # Ubuntu 22.04 in us-east-1, adjust as needed
+  ImageRecognitionInstance:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      InstanceType: "t2.micro"
+      KeyName: "EC2 Tutorial"
+      ImageId: ami-005fc0f236362e99f
       SecurityGroupIds:
-        - !Ref InstanceSecurityGroup
+        - !Ref MySecurityGroup
       UserData: 
         Fn::Base64: !Sub |
           #!/bin/bash
@@ -41,7 +41,7 @@ Resources:
           # Create Flask app directory and app
           git clone https://github.com/GuiCamposxD/image_recognition.git /home/ubuntu/flaskapp
           sudo mv /home/ubuntu/flaskapp/model/model5.keras /home/ubuntu/flaskapp
-          sudo rm -rf /home/ubuntu/flaskapp/Procfile /home/ubuntu/flaskapp/model /home/ubuntu/flaskapp/*.py /home/ubuntu/flaskapp/*.txt /home/ubuntu/flaskapp/*.pkl
+          sudo rm -rf /home/ubuntu/flaskapp/Procfile /home/ubuntu/flaskapp/aws /home/ubuntu/flaskapp/model /home/ubuntu/flaskapp/*.py /home/ubuntu/flaskapp/*.txt /home/ubuntu/flaskapp/*.pkl
           cat <<EOL > /home/ubuntu/flaskapp/app.py
           import os
           from flask import Flask, request, jsonify
@@ -123,10 +123,9 @@ Resources:
           # Run Flask app using Gunicorn in the background
           gunicorn -w 1 -b 0.0.0.0:5000 app:app --daemon --chdir /home/ubuntu/flaskapp
 
-
       Tags:
         - Key: Name
-          Value: MyFlaskAPIInstance
+          Value: ImageRecognitionInstance
 
   InstanceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -149,7 +148,7 @@ Resources:
 Outputs:
   EC2PublicIP:
     Description: Public IP of the EC2 instance
-    Value: !GetAtt MyEC2Instance.PublicIp
+    Value: !GetAtt ImageRecognitionInstance.PublicIp
   EC2PublicDNS:
     Description: Public DNS of the EC2 instance
-    Value: !GetAtt MyEC2Instance.PublicDnsName
+    Value: !GetAtt ImageRecognitionInstance.PublicDnsName

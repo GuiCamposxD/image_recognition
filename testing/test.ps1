@@ -1,7 +1,7 @@
 # Create a new HTTP Client
 Add-Type -AssemblyName "System.Net.Http"
 $file_name=$args[0]
-$Url = "http://127.0.0.1:5000/predict"
+$Url = "http://ec2-98-83-161-98.compute-1.amazonaws.com:5000/predict"
 $FilePath = "C:\Users\Lucas\Documents\USP\RP2-EI\image_recognition\testing\images\$file_name"
 
 $HttpClient = New-Object System.Net.Http.HttpClient
