@@ -1,0 +1,155 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: EC2 instance for Flask API with Nginx as reverse proxy
+
+Resources:
+  MyEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties: 
+      InstanceType: t2.micro
+      KeyName: EC2 Tutorial  # Replace with your own key pair name
+      ImageId: ami-005fc0f236362e99f  # Ubuntu 22.04 in us-east-1, adjust as needed
+      SecurityGroupIds:
+        - !Ref InstanceSecurityGroup
+      UserData: 
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          apt-get update -y
+          apt-get install -y python3 python3-pip nginx
+          
+          # Install Flask and Gunicorn
+          pip3 install --no-cache-dir flask gunicorn opencv-python-headless tensorflow-cpu flask Pillow
+          
+          # Configure Nginx to forward requests to Flask
+          cat <<EOL > /etc/nginx/sites-available/default
+          server {
+              listen 80;
+              server_name _;
+
+              location / {
+                  proxy_pass http://127.0.0.1:5000;
+                  proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto \$scheme;
+              }
+          }
+          EOL
+
+          # Start Nginx
+          systemctl restart nginx
+
+          # Create Flask app directory and app
+          git clone https://github.com/GuiCamposxD/image_recognition.git /home/ubuntu/flaskapp
+          sudo mv /home/ubuntu/flaskapp/model/model5.keras /home/ubuntu/flaskapp
+          sudo rm -rf /home/ubuntu/flaskapp/Procfile /home/ubuntu/flaskapp/model /home/ubuntu/flaskapp/*.py /home/ubuntu/flaskapp/*.txt /home/ubuntu/flaskapp/*.pkl
+          cat <<EOL > /home/ubuntu/flaskapp/app.py
+          import os
+          from flask import Flask, request, jsonify
+          from tensorflow.keras.preprocessing.image import load_img, img_to_array
+          from io import BytesIO
+          import numpy as np
+          import tensorflow as tf
+
+          app = Flask(__name__)
+
+          CLASS_IMAGES = [
+              "apple", "banana", "beetroot", "bell pepper", "cabbage", "capsicum", "carrot",
+              "cauliflower", "chilli pepper", "corn", "cucumber", "eggplant", "garlic",
+              "ginger", "grapes", "jalepeno", "kiwi", "lemon", "lettuce", "mango"
+            ]
+
+          # Path to save temporary images
+          TEMP_IMAGE_PATH = '/mnt/temp-images'
+
+          # Load the model
+          model = tf.keras.models.load_model('./model5.keras')
+          print("Model loaded successfully.")  # Debug statement to confirm model loading
+
+          # Prepare the image before making predictions
+          def prepare_image(img_stream):
+              # Convert the image stream (SpooledTemporaryFile) to BytesIO
+              img = BytesIO(img_stream.read())
+              
+              # Use load_img with the BytesIO stream
+              img = load_img(img, target_size=(128, 128))
+              img_array = img_to_array(img)
+              img_array = np.expand_dims(img_array, axis=0)
+              img_array = img_array / 255.0
+              return img_array
+
+          # Predict fruit or vegetable in the image
+          def predict_image(img):
+              img_array = prepare_image(img)
+              pred_prob = model.predict(img_array)
+              pred_class = np.argmax(pred_prob, axis=1)[0]
+              return pred_class, np.max(pred_prob)
+
+          @app.route("/predict", methods=["POST"])
+          def predict():
+              print("Prediction request received.")  # Debug statement
+              if 'file' not in request.files:
+                  print("No file found in the request.")  # Debug statement
+                  return jsonify({"error": "No file part"}), 400
+
+              file = request.files['file']
+              
+              if file.filename == '':
+                  print("File part found but no file selected.")  # Debug statement
+                  return jsonify({"error": "No selected file"}), 400
+
+              try:
+                  # Process the image and get the prediction
+                  print("Image prepared, making prediction...")  # Debug statement
+                  img_stream = file.stream  # This is an in-memory stream of the file
+                  pred_class, confidence = predict_image(img_stream)
+
+                  # Get the predicted fruit or vegetable class name
+                  predicted_label = CLASS_IMAGES[pred_class]
+
+                  print(f"Prediction successful: Class={pred_class}, Confidence={confidence}")  # Debug statement
+                  return jsonify({
+                      "predicted_label": predicted_label,
+                      "confidence": "{:.2f}".format(confidence * 100)
+                  })
+
+              except Exception as e:
+                  print(f"Error during prediction: {e}")  # Debug statement
+                  return jsonify({"error": str(e)}), 500
+
+          if __name__ == "__main__":
+              app.run(debug=False, host="0.0.0.0", port=5000)
+          EOL
+
+          # Run Flask app using Gunicorn in the background
+          gunicorn -w 1 -b 0.0.0.0:5000 app:app --daemon --chdir /home/ubuntu/flaskapp
+
+
+      Tags:
+        - Key: Name
+          Value: MyFlaskAPIInstance
+
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable HTTP and SSH access on the instance
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0  # SSH access (be careful with this for security)
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0  # Allow HTTP access to Nginx
+        - IpProtocol: tcp
+          FromPort: 5000
+          ToPort: 5000
+          CidrIp: 0.0.0.0/0  # Allow Flask app to be accessed directly on port 5000
+
+Outputs:
+  EC2PublicIP:
+    Description: Public IP of the EC2 instance
+    Value: !GetAtt MyEC2Instance.PublicIp
+  EC2PublicDNS:
+    Description: Public DNS of the EC2 instance
+    Value: !GetAtt MyEC2Instance.PublicDnsName
