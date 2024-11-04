@@ -55,8 +55,12 @@ Resources:
           CLASS_IMAGES = [
               "apple", "banana", "beetroot", "bell pepper", "cabbage", "capsicum", "carrot",
               "cauliflower", "chilli pepper", "corn", "cucumber", "eggplant", "garlic",
-              "ginger", "grapes", "jalepeno", "kiwi", "lemon", "lettuce", "mango"
-            ]
+              "ginger", "grapes", "jalepeno", "kiwi", "lemon", "lettuce", "mango", "onion",
+              "orange", "paprika", "pear", "peas", "pineapple", "pomegranate", "potato",
+              "raddish", "soy beans", "spinach", "sweetcorn", "sweetpotato", "tomato",
+              "turnip", "watermelon"
+          ]
+
 
           # Path to save temporary images
           TEMP_IMAGE_PATH = '/mnt/temp-images'
