@@ -8,7 +8,7 @@ fi
 
 # Set the image file and API URL
 IMAGE_FILE="$1"
-API_URL="http://ec2-98-83-161-98.compute-1.amazonaws.com:5000/predict"
+API_URL="http://ec2-3-81-235-23.compute-1.amazonaws.com:5000/predict"
 
 # Check if the file exists
 if [ ! -f "$IMAGE_FILE" ]; then
@@ -23,4 +23,4 @@ RESPONSE=$(curl -m 5 -X POST -F "file=@$IMAGE_FILE" "$API_URL")
 echo "API Response: $RESPONSE"
 
 # curl -X POST -F "file=@/path/to/your/image.jpg" http://localhost:5000/predict
-# curl -X POST -F "file=@/home/ubuntu/flaskapp/testing/images/banana.jpg" http://ec2-98-83-161-98.compute-1.amazonaws.com:5000/predict
+# curl -X POST -F "file=@/home/ubuntu/flaskapp/testing/images/banana.jpg" http://ec2-3-81-235-23.compute-1.amazonaws.com:5000/predict
