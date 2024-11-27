@@ -1,0 +1,119 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Setup for Fruit Recognition API with Rekognition and Dependencies
+
+Resources:
+  FruitImagesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: fruit-recognition-images
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  RekognitionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: RekognitionAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - rekognition:DetectLabels
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - arn:aws:s3:::fruit-recognition-images
+                  - arn:aws:s3:::fruit-recognition-images/*
+      Path: /
+
+  FruitRecognitionEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      KeyName: "EC2 Tutorial"  # Replace with your EC2 key pair name
+      ImageId: ami-0abcdef1234567890  # Replace with your preferred Amazon Linux 2 AMI ID
+      IamInstanceProfile:
+        Name: !Ref EC2InstanceProfile
+      SecurityGroupIds:
+        - !Ref FruitRecognitionSecurityGroup
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          yum update -y
+          yum install -y python3 git
+          pip3 install flask boto3
+
+          # Create the API code
+          mkdir -p /home/ec2-user/fruit-recognition-api
+          cat << EOF > /home/ec2-user/fruit-recognition-api/app.py
+          from flask import Flask, request, jsonify
+          import boto3
+
+          app = Flask(__name__)
+
+          @app.route('/predict', methods=['POST'])
+          def predict():
+              file = request.files['image']
+              client = boto3.client('rekognition')
+              
+              response = client.detect_labels(
+                  Image={'Bytes': file.read()},
+                  MaxLabels=10,
+                  MinConfidence=75
+              )
+              
+              fruits = [label['Name'] for label in response['Labels'] if label['Name'].lower() in {'apple', 'banana', 'grape', 'orange', 'mango'}]
+              result = {"fruit": fruits[0] if fruits else "Unknown"}
+              return jsonify(result)
+
+          if __name__ == "__main__":
+              app.run(host='0.0.0.0', port=80)
+          EOF
+
+          # Run the API
+          python3 /home/ec2-user/fruit-recognition-api/app.py &
+
+      Tags:
+        - Key: Name
+          Value: FruitRecognitionAPI
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref RekognitionExecutionRole
+
+  FruitRecognitionSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable HTTP and SSH access
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+Outputs:
+  BucketName:
+    Description: Name of the S3 bucket
+    Value: !Ref FruitImagesBucket
+
+  EC2PublicIP:
+    Description: Public IP of the EC2 instance
+    Value: !GetAtt FruitRecognitionEC2Instance.PublicIp
