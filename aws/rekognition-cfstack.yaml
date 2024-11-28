@@ -84,7 +84,7 @@ Resources:
           @app.route('/predict', methods=['POST'])
           def predict():
               try:
-                  file = request.files['image']
+                  file = request.files['file']
                   if not file:
                       return jsonify({"error": "No image provided"}), 400
 
