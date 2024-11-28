@@ -112,9 +112,10 @@ Resources:
                   # Return the label with the highest confidence (if any)
                   if sorted_labels:
                       predicted_label = sorted_labels[0]
-                      result = {"predicted_label": predicted_label['name'], "confidence": predicted_label['confidence']}
+                      confidence = "{:.2f}".format(predicted_label['confidence'])
+                      result = {"predicted_label": predicted_label['name'], "confidence": confidence}
                   else:
-                      result = {"predicted_label": "Unknown", "confidence": 0}
+                      result = {"predicted_label": "Unknown", "confidence": "0"}
                   
                   return jsonify(result)
               
