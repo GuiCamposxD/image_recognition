@@ -9,7 +9,7 @@ fi
 # Set the image file and API URL
 IMAGE_FILE="$1"
 # API_URL="http://ec2-3-81-235-23.compute-1.amazonaws.com:5000/predict"
-API_URL="http://ec2-18-234-238-140.compute-1.amazonaws.com:5000/predict"
+API_URL="http://ec2-34-228-153-48.compute-1.amazonaws.com:5000/predict"
 
 # Check if the file exists
 if [ ! -f "$IMAGE_FILE" ]; then
