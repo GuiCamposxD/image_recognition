@@ -96,12 +96,26 @@ Resources:
                       MinConfidence=75
                   )
                   
-                  detected_items = [
-                      label['Name'].lower()
+                  # Filter valid items and sort by confidence
+                  valid_labels = [
+                      {
+                          "name": label['Name'].lower(),
+                          "confidence": label['Confidence']
+                      }
                       for label in response['Labels']
                       if label['Name'].lower() in VALID_ITEMS
                   ]
-                  result = {"recognized_item": detected_items[0] if detected_items else "Unknown"}
+                  
+                  # Sort the valid labels by confidence in descending order
+                  sorted_labels = sorted(valid_labels, key=lambda x: x['confidence'], reverse=True)
+                  
+                  # Return the label with the highest confidence (if any)
+                  if sorted_labels:
+                      predicted_label = sorted_labels[0]
+                      result = {"predicted_label": predicted_label['name'], "confidence": predicted_label['confidence']}
+                  else:
+                      result = {"predicted_label": "Unknown", "confidence": 0}
+                  
                   return jsonify(result)
               
               except Exception as e:
