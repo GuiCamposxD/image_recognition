@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Setup for Fruit Recognition API with Rekognition and Dependencies
+Description: Setup for Fruit Recognition API with Flask, Gunicorn, and NGINX
 
 Resources:
   FruitImagesBucket:
@@ -36,58 +36,11 @@ Resources:
                 Resource:
                   - arn:aws:s3:::fruit-recognition-images
                   - arn:aws:s3:::fruit-recognition-images/*
+              - Effect: Allow
+                Action:
+                  - rekognition:DetectLabels
+                Resource: "*"
       Path: /
-
-  FruitRecognitionEC2Instance:
-    Type: AWS::EC2::Instance
-    Properties:
-      InstanceType: t2.micro
-      KeyName: "EC2 Tutorial"  # Replace with your EC2 key pair name
-      ImageId: ami-0abcdef1234567890  # Replace with your preferred Amazon Linux 2 AMI ID
-      IamInstanceProfile:
-        Name: !Ref EC2InstanceProfile
-      SecurityGroupIds:
-        - !Ref FruitRecognitionSecurityGroup
-      UserData:
-        Fn::Base64: |
-          #!/bin/bash
-          yum update -y
-          yum install -y python3 git
-          pip3 install flask boto3
-
-          # Create the API code
-          mkdir -p /home/ec2-user/fruit-recognition-api
-          cat << EOF > /home/ec2-user/fruit-recognition-api/app.py
-          from flask import Flask, request, jsonify
-          import boto3
-
-          app = Flask(__name__)
-
-          @app.route('/predict', methods=['POST'])
-          def predict():
-              file = request.files['image']
-              client = boto3.client('rekognition')
-              
-              response = client.detect_labels(
-                  Image={'Bytes': file.read()},
-                  MaxLabels=10,
-                  MinConfidence=75
-              )
-              
-              fruits = [label['Name'] for label in response['Labels'] if label['Name'].lower() in {'apple', 'banana', 'grape', 'orange', 'mango'}]
-              result = {"fruit": fruits[0] if fruits else "Unknown"}
-              return jsonify(result)
-
-          if __name__ == "__main__":
-              app.run(host='0.0.0.0', port=80)
-          EOF
-
-          # Run the API
-          python3 /home/ec2-user/fruit-recognition-api/app.py &
-
-      Tags:
-        - Key: Name
-          Value: FruitRecognitionAPI
 
   EC2InstanceProfile:
     Type: AWS::IAM::InstanceProfile
@@ -95,10 +48,102 @@ Resources:
       Roles:
         - !Ref RekognitionExecutionRole
 
+  FruitRecognitionEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      KeyName: "EC2 Tutorial"  # Replace with your EC2 key pair name
+      ImageId: ami-0166fe664262f664c  # Replace with your preferred Amazon Linux 2 AMI ID
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      SecurityGroupIds:
+        - !Ref FruitRecognitionSecurityGroup
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          yum update -y
+          yum install -y python3 git nginx
+          pip3 install --no-cache-dir flask gunicorn opencv-python-headless tensorflow-cpu Pillow boto3
+
+          # Set up Flask app
+          mkdir -p /home/ec2-user/fruit-recognition-api
+          cat << EOF > /home/ec2-user/fruit-recognition-api/app.py
+          from flask import Flask, request, jsonify
+          import boto3
+
+          app = Flask(__name__)
+
+          VALID_ITEMS = {
+              "apple", "banana", "beetroot", "bell pepper", "cabbage", "capsicum", "carrot",
+              "cauliflower", "chilli pepper", "corn", "cucumber", "eggplant", "garlic",
+              "ginger", "grapes", "jalepeno", "kiwi", "lemon", "lettuce", "mango", "onion",
+              "orange", "paprika", "pear", "peas", "pineapple", "pomegranate", "potato",
+              "raddish", "soy beans", "spinach", "sweetcorn", "sweetpotato", "tomato",
+              "turnip", "watermelon"
+          }
+
+          @app.route('/predict', methods=['POST'])
+          def predict():
+              try:
+                  file = request.files['image']
+                  if not file:
+                      return jsonify({"error": "No image provided"}), 400
+
+                  client = boto3.client('rekognition', region_name='us-east-1')
+                  
+                  response = client.detect_labels(
+                      Image={'Bytes': file.read()},
+                      MaxLabels=10,
+                      MinConfidence=75
+                  )
+                  
+                  detected_items = [
+                      label['Name'].lower()
+                      for label in response['Labels']
+                      if label['Name'].lower() in VALID_ITEMS
+                  ]
+                  result = {"recognized_item": detected_items[0] if detected_items else "Unknown"}
+                  return jsonify(result)
+              
+              except Exception as e:
+                  # Log the exception details (optional)
+                  app.logger.error(f"Error processing request: {e}")
+                  return jsonify({"error": str(e)}), 500
+
+          if __name__ == "__main__":
+              app.run(host='0.0.0.0', port=5000)
+          EOF
+
+          # Configure Nginx
+          cat << EOL > /etc/nginx/conf.d/fruit-recognition.conf
+          server {
+              listen 80;
+              server_name _;
+
+              location / {
+                  proxy_pass http://127.0.0.1:5000;
+                  proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto \$scheme;
+              }
+          }
+          EOL
+
+          # Enable and start services
+          systemctl daemon-reload
+          systemctl enable nginx
+          systemctl start nginx
+          # Run Flask app using Gunicorn in the background
+          gunicorn -w 1 -b 0.0.0.0:5000 app:app --daemon --chdir /home/ec2-user/fruit-recognition-api/
+
+      Tags:
+        - Key: Name
+          Value: FruitRecognitionAPI
+
   FruitRecognitionSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Enable HTTP and SSH access
+      GroupDescription: Enable HTTP, Flask, and SSH access
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 22
@@ -107,6 +152,10 @@ Resources:
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 5000
+          ToPort: 5000
           CidrIp: 0.0.0.0/0
 
 Outputs:
